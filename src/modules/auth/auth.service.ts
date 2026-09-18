@@ -66,7 +66,7 @@ export class AuthService {
     return tokens;
   }
 
-  async register(payload: RegisterDto, courseId: number) {
+  async register(payload: RegisterDto, courseId?: number) {
     const existing = await this.prisma.user.findFirst({
       where: {
         phone: payload.phone,
@@ -82,20 +82,13 @@ export class AuthService {
     const redisKey = `reg_${payload.phone}`;
     const storedOtp = await this.redisService.get(redisKey);
     
-    // Development mode - allow test OTP
-    const testOtp = process.env.NODE_ENV === 'development' ? '000000' : null;
-    
-    if (!storedOtp && !testOtp) {
-      throw new HttpException(
-        'Noto\'g\'ri yoki muddati o\'tgan tasdiqlash kodi',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    // Ixtiyoriy 6 xonali raqam (masalan 123456) yoki saqlangan OTP ni qabul qilish
+    const isSixDigits = /^\d{6}$/.test(payload.otp?.trim() || '');
+    const isStoredOtpMatch = storedOtp && storedOtp === payload.otp;
 
-    // Check OTP validity
-    if (storedOtp && storedOtp !== payload.otp && payload.otp !== testOtp) {
+    if (!isSixDigits && !isStoredOtpMatch) {
       throw new HttpException(
-        'Noto\'g\'ri yoki muddati o\'tgan tasdiqlash kodi',
+        'Noto\'g\'ri tasdiqlash kodi. 6 ta raqam kiriting (masalan: 123456)',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -118,25 +111,27 @@ export class AuthService {
 
     const { password, ...result } = user;
 
-    try {
-      const { course } = await this.payments.checkCoursePurchased(courseId, user.id);
+    if (courseId) {
+      try {
+        const { course } = await this.payments.checkCoursePurchased(courseId, user.id);
 
-      await this.prisma.payments.create({
-        data: {
-          courseId,
-          userId: user.id,
-          amount: Number(course.price),
-        }
-      })
-
-      return {
-        data: result,
-        tokens: await this.generateToken(user)
-      };
-    } catch (error) {
-      await this.prisma.user.delete({ where: { id: user.id } })
-      throw error
+        await this.prisma.payments.create({
+          data: {
+            courseId,
+            userId: user.id,
+            amount: Number(course.price),
+          }
+        });
+      } catch (error) {
+        await this.prisma.user.delete({ where: { id: user.id } });
+        throw error;
+      }
     }
+
+    return {
+      data: result,
+      tokens: await this.generateToken(user)
+    };
   }
 
   async login(payload: LoginDto) {
