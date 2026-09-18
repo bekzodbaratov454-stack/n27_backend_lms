@@ -16,7 +16,7 @@ import { PaymentsService } from "../payments/payments.service";
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('SECRET_KEY'),
+        secret: configService.get<string>('SECRET_KEY') || configService.get<string>('ACCESS_SECRET_KEY') || 'jwt_secret_key_default',
         signOptions: { expiresIn: '1d' },
       }),
       inject: [ConfigService],
