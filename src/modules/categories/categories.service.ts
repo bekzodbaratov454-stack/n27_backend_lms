@@ -20,24 +20,24 @@ export class CategoriesService {
   }
 
   async findAll() {
-    const categories = await this.prisma.categories.findMany({
-      include: {
-        courses: true,
-      },
-    });
+    try {
+      const categories = await this.prisma.categories.findMany({
+        orderBy: { created_at: "desc" },
+      });
 
-    return {
-      success: true,
-      data: categories,
-    };
+      return {
+        success: true,
+        data: categories,
+      };
+    } catch (error) {
+      console.error('Categories findAll error:', error);
+      throw error;
+    }
   }
 
   async findOne(id: number) {
     const category = await this.prisma.categories.findUnique({
       where: { id },
-      include: {
-        courses: true,
-      },
     });
 
     if (!category) {
@@ -71,20 +71,20 @@ export class CategoriesService {
   async remove(id: number) {
     const existing = await this.prisma.categories.findUnique({
       where: { id },
-      include: {
-        courses: true,
-      },
     });
 
     if (!existing) {
-      throw new NotFoundException(
-        "Category not found  Category has courses Fir",
-      );
+      throw new NotFoundException("Category not found");
     }
 
-    if (existing.courses) {
+    // Check if category has courses
+    const coursesCount = await this.prisma.courses.count({
+      where: { categoryId: id }
+    });
+
+    if (coursesCount > 0) {
       throw new ConflictException(
-        "Category has courses. First you need to delete connected courses then you'll able to delete",
+        "Category has courses. First delete connected courses then delete category",
       );
     }
 

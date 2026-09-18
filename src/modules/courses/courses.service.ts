@@ -21,12 +21,17 @@ export class CoursesService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll(page = 1, limit = 10) {
-    return this.prisma.courses.findMany({
-      skip: (page - 1) * limit,
-      take: limit,
-      include: { categories: true, sections: true },
-      orderBy: { created_at: "desc" },
-    });
+    try {
+      return this.prisma.courses.findMany({
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { categories: true, sections: true },
+        orderBy: { created_at: "desc" },
+      });
+    } catch (error) {
+      console.error('Courses findAll error:', error);
+      throw error;
+    }
   }
 
   async findOne(id: number) {
